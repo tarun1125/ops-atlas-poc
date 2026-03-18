@@ -320,7 +320,7 @@ async function initializeSearchPage() {
       return;
     }
 
-    const cases = await loadCases(selectedApp);
+    const cases = await loadCases(app);
 
     let bestCase = null;
     let bestScore = 0;
