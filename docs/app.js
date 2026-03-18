@@ -80,7 +80,7 @@ function saveStoredList(key, value) {
 }
 
 async function loadApps(selectElement, preferredValue = "") {
-  const response = await fetch(`apps/apps.json`);
+  const response = await fetch(`./apps/apps.json`);
   const apps = await response.json();
 
   selectElement.innerHTML = '<option value="">Select an application</option>';
@@ -97,7 +97,7 @@ async function loadApps(selectElement, preferredValue = "") {
 }
 
 async function loadCases(app) {
-  const response = await fetch(`apps/${selectedApp}/cases/index.json`);
+  const response = await fetch(`./apps/${selectedApp}/cases/index.json`);
   const staticCases = await response.json();
   const localCases = getStoredList(`cases_${selectedApp}`);
   return [...staticCases, ...localCases];
