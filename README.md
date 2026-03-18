@@ -1,5 +1,8 @@
 # Ops Atlas POC
 
+## App access Link
+https://tarun1125.github.io/ops-atlas-poc/
+
 ## Web POC
 
 This repository includes a minimal static web proof of concept in `web/` for demonstrating an Ops Atlas workflow on GitHub Pages using only HTML, CSS, JavaScript, static JSON, and `localStorage`.
