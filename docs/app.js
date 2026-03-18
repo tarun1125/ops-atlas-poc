@@ -97,9 +97,9 @@ async function loadApps(selectElement, preferredValue = "") {
 }
 
 async function loadCases(app) {
-  const response = await fetch(`./apps/${selectedApp}/cases/index.json`);
+  const response = await fetch(`./apps/${app}/cases/index.json`);
   const staticCases = await response.json();
-  const localCases = getStoredList(`cases_${selectedApp}`);
+  const localCases = getStoredList(`cases_${app}`);
   return [...staticCases, ...localCases];
 }
 
@@ -359,7 +359,7 @@ function validateCasePayload(payload) {
 }
 
 function storeCaseForApp(app, payload) {
-  const key = `cases_${selectedApp}`;
+  const key = `cases_${app}`;
   const cases = getStoredList(key);
   cases.push(payload);
   saveStoredList(key, cases);
