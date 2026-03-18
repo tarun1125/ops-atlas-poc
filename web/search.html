@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Search Incident | Ops Atlas</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section class="card">
+        <div class="page-header">
+          <div>
+            <p class="eyebrow">Ops Atlas</p>
+            <h1>Search Incident Cases</h1>
+          </div>
+          <div class="toolbar">
+            <span class="role-pill">User Portal</span>
+            <button id="logout-button" type="button" class="button button-secondary">Logout</button>
+          </div>
+        </div>
+
+        <form id="search-form" class="stack-lg">
+          <label>
+            Application
+            <select id="app-select" required>
+              <option value="">Loading applications...</option>
+            </select>
+          </label>
+
+          <label>
+            Issue Description
+            <textarea
+              id="issue-input"
+              rows="4"
+              placeholder="Select an application first, then describe the incident symptoms or failure..."
+              required
+              disabled
+            ></textarea>
+          </label>
+
+          <button id="search-button" type="submit" class="button" disabled>Search</button>
+        </form>
+      </section>
+
+      <section id="result-card" class="card hidden"></section>
+    </main>
+
+    <script src="auth.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
