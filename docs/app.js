@@ -1,7 +1,8 @@
-const BASE_PATH = window.location.pathname.includes("github.io")
-  ? "/ops-atlas-poc"   // ⚠️ replace with your repo name
+const BASE_PATH = window.location.hostname.includes("github.io")
+  ? `/${window.location.pathname.split("/")[1]}`
   : "";
-const APPS_PATH = "${BASE_PATH}/apps/apps.json";
+
+const APPS_PATH = `${BASE_PATH}/apps/apps.json`;
 
 function tokenize(text) {
   return String(text || "")
@@ -154,7 +155,7 @@ async function initializeSearchPage() {
       return;
     }
 
-    const response = await fetch(`${BASE_PATH}/apps/${app}/cases/index.json`);
+    const response = await fetch(`${BASE_PATH}/apps/${selectedApp}/cases/index.json`);
     const cases = await response.json();
 
     let bestCase = null;
