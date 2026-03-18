@@ -1,4 +1,4 @@
-const APPS_PATH = "../apps/apps.json";
+const APPS_PATH = "apps/apps.json";
 const REQUEST_QUEUE_KEY = "request_queue";
 
 function tokenize(text) {
@@ -97,9 +97,9 @@ async function loadApps(selectElement, preferredValue = "") {
 }
 
 async function loadCases(app) {
-  const response = await fetch(`../apps/${app}/cases/index.json`);
+  const response = await fetch(`apps/${selectedApp}/cases/index.json`);
   const staticCases = await response.json();
-  const localCases = getStoredList(`cases_${app}`);
+  const localCases = getStoredList(`cases_${selectedApp}`);
   return [...staticCases, ...localCases];
 }
 
@@ -359,7 +359,7 @@ function validateCasePayload(payload) {
 }
 
 function storeCaseForApp(app, payload) {
-  const key = `cases_${app}`;
+  const key = `cases_${selectedApp}`;
   const cases = getStoredList(key);
   cases.push(payload);
   saveStoredList(key, cases);
