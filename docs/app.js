@@ -85,21 +85,21 @@ async function loadApps(selectElement, preferredValue = "") {
 
   selectElement.innerHTML = '<option value="">Select an application</option>';
 
-  apps.forEach((app) => {
+  apps.forEach((selectedApp) => {
     const option = document.createElement("option");
-    option.value = app;
-    option.textContent = app.toUpperCase();
-    option.selected = preferredValue === app;
+    option.value = selectedApp;
+    option.textContent = selectedApp.toUpperCase();
+    option.selected = preferredValue === selectedApp;
     selectElement.appendChild(option);
   });
 
   return apps;
 }
 
-async function loadCases(app) {
-  const response = await fetch(`./apps/${app}/cases/index.json`);
+async function loadCases(selectedApp) {
+  const response = await fetch(`./apps/${selectedApp}/cases/index.json`);
   const staticCases = await response.json();
-  const localCases = getStoredList(`cases_${app}`);
+  const localCases = getStoredList(`cases_${selectedApp}`);
   return [...staticCases, ...localCases];
 }
 
@@ -320,7 +320,7 @@ async function initializeSearchPage() {
       return;
     }
 
-    const cases = await loadCases(app);
+    const cases = await loadCases(selectedApp);
 
     let bestCase = null;
     let bestScore = 0;
@@ -349,7 +349,7 @@ async function initializeSearchPage() {
 
 function validateCasePayload(payload) {
   return Boolean(
-    payload.app &&
+    payload.selectedApp &&
       payload.problem &&
       payload.symptoms &&
       payload.root_cause &&
@@ -358,8 +358,8 @@ function validateCasePayload(payload) {
   );
 }
 
-function storeCaseForApp(app, payload) {
-  const key = `cases_${app}`;
+function storeCaseForApp(selectedApp, payload) {
+  const key = `cases_${selectedApp}`;
   const cases = getStoredList(key);
   cases.push(payload);
   saveStoredList(key, cases);
@@ -373,7 +373,7 @@ function renderQueue(messageContainer) {
   }
 
   const queue = getStoredList(REQUEST_QUEUE_KEY).filter(
-    (item) => item && item.id && item.app && item.problem && item.status === "PENDING"
+    (item) => item && item.id && item.selectedApp && item.problem && item.status === "PENDING"
   );
 
   queueBody.innerHTML = "";
@@ -383,7 +383,7 @@ function renderQueue(messageContainer) {
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${item.id}</td>
-      <td>${item.app.toUpperCase()}</td>
+      <td>${item.selectedApp.toUpperCase()}</td>
       <td>${item.problem}</td>
       <td>
         <div class="table-actions">
@@ -400,7 +400,7 @@ function renderQueue(messageContainer) {
       const action = button.getAttribute("data-action");
       const id = button.getAttribute("data-id");
       const currentQueue = getStoredList(REQUEST_QUEUE_KEY).filter(
-        (item) => item && item.id && item.app && item.problem && item.status === "PENDING"
+        (item) => item && item.id && item.selectedApp && item.problem && item.status === "PENDING"
       );
       const target = currentQueue.find((item) => item.id === id);
       if (!target) {
@@ -411,7 +411,7 @@ function renderQueue(messageContainer) {
       if (action === "approve") {
         storeCaseForApp(target.app, {
           case_id: `CASE-${Date.now()}`,
-          app: target.app,
+          app: target.selectedApp,
           problem: target.problem,
           symptoms: "To be filled",
           root_cause: "To be filled",
@@ -483,7 +483,7 @@ async function initializeAdminPage() {
       return;
     }
 
-    storeCaseForApp(payload.app, payload);
+    storeCaseForApp(payload.selectedApp, payload);
     showMessage(messageContainer, "Case saved (POC)", "status-confirmed");
     form.reset();
     renderQueue(messageContainer);
