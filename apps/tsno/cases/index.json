@@ -1,0 +1,26 @@
+[
+  {
+    "case_id": "CASE-001",
+    "problem": "Tower backhaul microwave link degraded after weather event",
+    "symptoms": "High latency, reduced throughput, fluctuating RSSI and packet loss alarms",
+    "root_cause": "Antenna alignment drift introduced by strong winds lowered signal quality on the backhaul link",
+    "resolution": "check radio link statistics\ninspect alignment markers\nrealign antenna within tolerance\nretest throughput",
+    "verification": "RSSI stabilizes, throughput normalizes, and packet loss alarms clear"
+  },
+  {
+    "case_id": "CASE-002",
+    "problem": "Kubernetes node agent stopped reporting metrics in the transport stack",
+    "symptoms": "Cluster dashboard gaps, missing node heartbeat, alerts for unavailable telemetry endpoints",
+    "root_cause": "Container runtime on the node exhausted file descriptors and the metrics sidecar failed",
+    "resolution": "kubectl describe node <node>\nreview runtime logs\nincrease file descriptor limit\nrestart node agent pods",
+    "verification": "Telemetry resumes for the node and heartbeat alerts resolve within one collection interval"
+  },
+  {
+    "case_id": "CASE-003",
+    "problem": "Database volume full on subscriber inventory platform",
+    "symptoms": "Write failures, slow transactions, database alerts for low free storage",
+    "root_cause": "Retention cleanup job failed for three cycles and old audit records filled the attached volume",
+    "resolution": "df -h\ncheck cleanup job history\npurge expired audit records\nrerun retention task and verify free space",
+    "verification": "Database writes succeed and free storage remains above operational threshold"
+  }
+]

@@ -1,0 +1,26 @@
+[
+  {
+    "case_id": "CASE-001",
+    "problem": "Core router not forwarding MPLS traffic to downstream edge sites",
+    "symptoms": "Packet drops between POP locations, rising latency, unreachable customer prefixes",
+    "root_cause": "Routing table misconfiguration after a manual static route update on the core router",
+    "resolution": "show ip route\ncompare intended prefixes\nconfigure corrected static route\nclear stale forwarding entry",
+    "verification": "Traffic restored, packet loss cleared, and downstream sites report normal latency"
+  },
+  {
+    "case_id": "CASE-002",
+    "problem": "BGP session flap between aggregation router and upstream carrier",
+    "symptoms": "Intermittent route withdrawal alerts, short service interruptions, increased CPU on routing process",
+    "root_cause": "Mismatched keepalive and hold timer settings after a peer template change",
+    "resolution": "show bgp summary\nreview neighbor timer values\napply matching keepalive and hold timers\nreset the affected session",
+    "verification": "BGP peer remains established for 30 minutes and external route advertisements stabilize"
+  },
+  {
+    "case_id": "CASE-003",
+    "problem": "Linux log collector node reports disk space full",
+    "symptoms": "Write failures, delayed syslog ingestion, application crash loop on collector service",
+    "root_cause": "Compressed and rotated log archives accumulated under /var/log and exhausted the root volume",
+    "resolution": "df -h\ndu -sh /var/log/*\narchive or remove stale log bundles\nrestart the log collector service",
+    "verification": "Disk usage returns below 70 percent and log ingestion resumes without errors"
+  }
+]
