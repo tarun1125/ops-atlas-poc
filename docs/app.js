@@ -1,4 +1,4 @@
-const APPS_PATH = "../apps/apps.json";
+const APPS_PATH = "/apps/apps.json";
 
 function tokenize(text) {
   return String(text || "")
@@ -151,7 +151,7 @@ async function initializeSearchPage() {
       return;
     }
 
-    const response = await fetch(`../apps/${selectedApp}/cases/index.json`);
+    const response = await fetch(`/apps/${selectedApp}/cases/index.json`);
     const cases = await response.json();
 
     let bestCase = null;
