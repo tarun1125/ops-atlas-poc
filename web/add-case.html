@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Add Case | OpsGuide POC</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section class="card">
+        <div class="page-header">
+          <div>
+            <p class="eyebrow">Admin Flow</p>
+            <h1>Add a New Incident Case</h1>
+          </div>
+          <a class="text-link" href="index.html">← Home</a>
+        </div>
+
+        <p class="notice">
+          This proof of concept stores draft search details in localStorage and logs new
+          cases in the browser console.
+        </p>
+
+        <form id="case-form" class="stack-lg">
+          <label>
+            App
+            <select id="case-app" required>
+              <option value="">Loading applications...</option>
+            </select>
+          </label>
+
+          <label>
+            Problem
+            <textarea id="case-problem" rows="3" required></textarea>
+          </label>
+
+          <label>
+            Symptoms
+            <textarea id="case-symptoms" rows="3" required></textarea>
+          </label>
+
+          <label>
+            Root Cause
+            <textarea id="case-root-cause" rows="3" required></textarea>
+          </label>
+
+          <label>
+            Resolution
+            <textarea id="case-resolution" rows="4" required></textarea>
+          </label>
+
+          <label>
+            Verification
+            <textarea id="case-verification" rows="3" required></textarea>
+          </label>
+
+          <button type="submit" class="button">Save Case</button>
+        </form>
+      </section>
+    </main>
+
+    <script src="auth.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
