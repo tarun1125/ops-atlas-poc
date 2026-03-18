@@ -1,8 +1,8 @@
-const BASE_PATH = window.location.hostname.includes("github.io")
-  ? `/${window.location.pathname.split("/")[1]}`
-  : "";
+// const BASE_PATH = window.location.hostname.includes("github.io")
+//   ? `/${window.location.pathname.split("/")[1]}`
+//   : "";
 
-const APPS_PATH = `${BASE_PATH}/apps/apps.json`;
+// const APPS_PATH = `${BASE_PATH}/apps/apps.json`;
 
 function tokenize(text) {
   return String(text || "")
@@ -40,7 +40,7 @@ function toPercent(value) {
 }
 
 async function loadApps(selectElement, preferredValue = "") {
-  const response = await fetch(APPS_PATH);
+  const response = await fetch(`apps/apps.json`);
   const apps = await response.json();
 
   selectElement.innerHTML = '<option value="">Select an application</option>';
@@ -155,7 +155,7 @@ async function initializeSearchPage() {
       return;
     }
 
-    const response = await fetch(`${BASE_PATH}/apps/${selectedApp}/cases/index.json`);
+    const response = await fetch(`apps/${selectedApp}/cases/index.json`)
     const cases = await response.json();
 
     let bestCase = null;
