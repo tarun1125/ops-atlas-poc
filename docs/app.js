@@ -1,4 +1,4 @@
-const APPS_PATH = "apps/apps.json";
+// const APPS_PATH = "apps/apps.json";
 const REQUEST_QUEUE_KEY = "request_queue";
 
 function tokenize(text) {
@@ -80,7 +80,7 @@ function saveStoredList(key, value) {
 }
 
 async function loadApps(selectElement, preferredValue = "") {
-  const response = await fetch(APPS_PATH);
+  const response = await fetch(`apps/apps.json`);
   const apps = await response.json();
 
   selectElement.innerHTML = '<option value="">Select an application</option>';
