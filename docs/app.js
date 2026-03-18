@@ -1,22 +1,30 @@
-// const APPS_PATH = "apps/apps.json";
 const REQUEST_QUEUE_KEY = "request_queue";
+
+// Stop words excluded from keyword scoring
+const STOP_WORDS = new Set([
+  "a","an","the","is","are","was","were","be","been","being",
+  "have","has","had","do","does","did","will","would","could",
+  "should","may","might","shall","can","need","on","in","at",
+  "to","for","of","and","or","not","no","by","with","from",
+  "up","out","as","it","its","this","that","these","those",
+  "after","before","between","into","through","during","after",
+  "above","below","then","once","here","there","when","where",
+  "why","how","all","both","each","few","more","most","other",
+  "some","such","than","too","very","just","but","also","so"
+]);
 
 function tokenize(text) {
   return String(text || "")
     .toLowerCase()
     .split(/[^a-z0-9]+/)
-    .filter(Boolean);
+    .filter((word) => word.length > 1 && !STOP_WORDS.has(word));
 }
 
 function similarity(a, b) {
   const sourceWords = tokenize(a);
-  if (!sourceWords.length) {
-    return 0;
-  }
-
+  if (!sourceWords.length) return 0;
   const comparisonWords = new Set(tokenize(b));
   const overlappingWords = sourceWords.filter((word) => comparisonWords.has(word)).length;
-
   return overlappingWords / sourceWords.length;
 }
 
@@ -27,15 +35,9 @@ function getMatchedKeywords(a, b) {
 }
 
 function getStatus(score) {
-  if (score >= 0.75) {
-    return { label: "CONFIRMED SOLUTION", className: "status-confirmed" };
-  }
-
-  if (score >= 0.4) {
-    return { label: "POSSIBLE MATCH", className: "status-possible" };
-  }
-
-  return { label: "NO KNOWN SOLUTION", className: "status-none" };
+  if (score >= 0.55) return { label: "CONFIRMED SOLUTION", className: "status-confirmed" };
+  if (score >= 0.25) return { label: "POSSIBLE MATCH",    className: "status-possible"  };
+  return                     { label: "NO KNOWN SOLUTION", className: "status-none"      };
 }
 
 function toPercent(value) {
@@ -43,20 +45,17 @@ function toPercent(value) {
 }
 
 function showMessage(container, text, statusClass = "status-possible") {
-  if (!container) {
-    return;
-  }
-
+  if (!container) return;
   container.className = `card ${statusClass}`;
   container.textContent = text;
   container.classList.remove("hidden");
+  // Auto-dismiss after 4 seconds
+  clearTimeout(container._dismissTimer);
+  container._dismissTimer = setTimeout(() => hideMessage(container), 4000);
 }
 
 function hideMessage(container) {
-  if (!container) {
-    return;
-  }
-
+  if (!container) return;
   container.classList.add("hidden");
   container.textContent = "";
 }
@@ -64,10 +63,7 @@ function hideMessage(container) {
 function getStoredList(key) {
   try {
     const raw = localStorage.getItem(key);
-    if (!raw) {
-      return [];
-    }
-
+    if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
@@ -79,17 +75,27 @@ function saveStoredList(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+// Display names for app IDs
+const APP_DISPLAY_NAMES = {
+  rag:  "Network Core Router (RAG)",
+  dem:  "Digital Edge Mediation (DEM)",
+  tsno: "Transport Stack NOC (TSNO)",
+};
+
+function appDisplayName(id) {
+  return APP_DISPLAY_NAMES[id] || id.toUpperCase();
+}
+
 async function loadApps(selectElement, preferredValue = "") {
-  const response = await fetch(`./apps/apps.json`);
+  const response = await fetch("./apps/apps.json");
   const apps = await response.json();
 
   selectElement.innerHTML = '<option value="">Select an application</option>';
-
-  apps.forEach((selectedApp) => {
+  apps.forEach((appId) => {
     const option = document.createElement("option");
-    option.value = selectedApp;
-    option.textContent = selectedApp.toUpperCase();
-    option.selected = preferredValue === selectedApp;
+    option.value = appId;
+    option.textContent = appDisplayName(appId);
+    option.selected = preferredValue === appId;
     selectElement.appendChild(option);
   });
 
@@ -103,37 +109,31 @@ async function loadCases(selectedApp) {
   return [...staticCases, ...localCases];
 }
 
-function buildRequest(selectedApp, issueDescription) {
+function buildRequest(appId, issueDescription) {
   return {
     id: `REQ-${Date.now()}`,
-    app: selectedApp,
+    app: appId,           // FIX: consistent key is always "app"
     problem: issueDescription,
     status: "PENDING",
   };
 }
 
-function submitRequest(selectedApp, issueDescription) {
-  if (!selectedApp || !issueDescription) {
-    return false;
-  }
+function submitRequest(appId, issueDescription) {
+  if (!appId || !issueDescription) return false;
 
   const confirmed = window.confirm(
     "Submit this incident as a request for admin approval to create a new case?"
   );
-
-  if (!confirmed) {
-    return false;
-  }
+  if (!confirmed) return false;
 
   const queue = getStoredList(REQUEST_QUEUE_KEY);
-  queue.push(buildRequest(selectedApp, issueDescription));
+  queue.push(buildRequest(appId, issueDescription));
   saveStoredList(REQUEST_QUEUE_KEY, queue);
   return true;
 }
 
 function renderResult(container, bestCase, score, selectedApp, issueDescription, matchedKeywords) {
   const confidence = score;
-  const accuracy = confidence * 0.9;
   const status = getStatus(score);
   const matchedLabel = matchedKeywords.length ? matchedKeywords.join(", ") : "None";
   const requestDisabled = status.label === "CONFIRMED SOLUTION";
@@ -149,24 +149,12 @@ function renderResult(container, bestCase, score, selectedApp, issueDescription,
       ? `<p class="empty-state">No similar incident found.</p>`
       : `
         <div class="result-grid">
-          <article>
-            <h3>Problem</h3>
-            <p>${bestCase.problem}</p>
-          </article>
-          <article>
-            <h3>Resolution</h3>
-            <pre>${bestCase.resolution}</pre>
-          </article>
+          <article><h3>Problem</h3><p>${bestCase.problem}</p></article>
+          <article><h3>Resolution</h3><pre>${bestCase.resolution}</pre></article>
         </div>
         <div class="result-grid secondary-grid">
-          <article>
-            <h3>Symptoms</h3>
-            <p>${bestCase.symptoms || "To be filled"}</p>
-          </article>
-          <article>
-            <h3>Verification</h3>
-            <p>${bestCase.verification || "To be filled"}</p>
-          </article>
+          <article><h3>Symptoms</h3><p>${bestCase.symptoms || "To be filled"}</p></article>
+          <article><h3>Verification</h3><p>${bestCase.verification || "To be filled"}</p></article>
         </div>
       `;
 
@@ -182,7 +170,6 @@ function renderResult(container, bestCase, score, selectedApp, issueDescription,
     </div>
     <div class="metrics">
       <p><strong>Confidence Score:</strong> ${toPercent(confidence)}</p>
-      <p><strong>Accuracy Score:</strong> ${toPercent(accuracy)}</p>
     </div>
     <p><strong>Matched Keywords:</strong> ${matchedLabel}</p>
     ${warningMarkup}
@@ -207,9 +194,8 @@ function renderResult(container, bestCase, score, selectedApp, issueDescription,
       const submitted = submitRequest(selectedApp, issueDescription);
       if (submitted) {
         const helper = container.querySelector(".helper-text");
-        if (helper) {
-          helper.textContent = "Request submitted for admin approval";
-        }
+        if (helper) helper.textContent = "Request submitted for admin approval";
+        requestButton.disabled = true;
       }
     });
   }
@@ -218,17 +204,13 @@ function renderResult(container, bestCase, score, selectedApp, issueDescription,
 function updateSearchControls(appSelect, issueInput, searchButton) {
   const hasApp = Boolean(appSelect.value);
   const hasIssue = Boolean(issueInput.value.trim());
-
   issueInput.disabled = !hasApp;
   searchButton.disabled = !(hasApp && hasIssue);
 }
 
 function attachLogout(buttonId = "logout-button") {
   const button = document.getElementById(buttonId);
-  if (!button) {
-    return;
-  }
-
+  if (!button) return;
   button.addEventListener("click", () => {
     localStorage.removeItem("role");
     window.location.href = "index.html";
@@ -236,56 +218,43 @@ function attachLogout(buttonId = "logout-button") {
 }
 
 function initializeLoginPage() {
-  const userForm = document.getElementById("user-login-form");
+  const userForm  = document.getElementById("user-login-form");
   const adminForm = document.getElementById("admin-login-form");
-  const message = document.getElementById("login-message");
-
-  if (!userForm || !adminForm || !message) {
-    return;
-  }
+  const message   = document.getElementById("login-message");
+  if (!userForm || !adminForm || !message) return;
 
   const handleLogin = (username, password, expectedUsername, expectedPassword, role, target) => {
     hideMessage(message);
-
     if (username === expectedUsername && password === expectedPassword) {
       localStorage.setItem("role", role);
       window.location.href = target;
       return;
     }
-
     showMessage(message, "Invalid username or password.", "status-none");
   };
 
-  userForm.addEventListener("submit", (event) => {
-    event.preventDefault();
+  userForm.addEventListener("submit", (e) => {
+    e.preventDefault();
     handleLogin(
       document.getElementById("user-username").value.trim(),
       document.getElementById("user-password").value,
-      "user1",
-      "p@ssword",
-      "user",
-      "search.html"
+      "user1", "p@ssword", "user", "search.html"
     );
   });
 
-  adminForm.addEventListener("submit", (event) => {
-    event.preventDefault();
+  adminForm.addEventListener("submit", (e) => {
+    e.preventDefault();
     handleLogin(
       document.getElementById("admin-username").value.trim(),
       document.getElementById("admin-password").value,
-      "admin",
-      "admin",
-      "admin",
-      "admin.html"
+      "admin", "admin", "admin", "admin.html"
     );
   });
 }
 
 async function initializeSearchPage() {
   const form = document.getElementById("search-form");
-  if (!form) {
-    return;
-  }
+  if (!form) return;
 
   if (!isUser() && !isAdmin()) {
     window.location.href = "index.html";
@@ -294,86 +263,89 @@ async function initializeSearchPage() {
 
   attachLogout();
 
-  const appSelect = document.getElementById("app-select");
-  const issueInput = document.getElementById("issue-input");
+  const appSelect    = document.getElementById("app-select");
+  const issueInput   = document.getElementById("issue-input");
   const searchButton = document.getElementById("search-button");
-  const resultCard = document.getElementById("result-card");
+  const resultCard   = document.getElementById("result-card");
 
   try {
     await loadApps(appSelect);
     updateSearchControls(appSelect, issueInput, searchButton);
   } catch (error) {
-    showMessage(resultCard, "Unable to load applications.", "status-none");
+    showMessage(resultCard, "Unable to load applications. Please refresh the page.", "status-none");
     return;
   }
 
-  appSelect.addEventListener("change", () => updateSearchControls(appSelect, issueInput, searchButton));
-  issueInput.addEventListener("input", () => updateSearchControls(appSelect, issueInput, searchButton));
+  appSelect.addEventListener("change",  () => updateSearchControls(appSelect, issueInput, searchButton));
+  issueInput.addEventListener("input",  () => updateSearchControls(appSelect, issueInput, searchButton));
 
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
 
-    const selectedApp = appSelect.value;
+    const selectedApp     = appSelect.value;
     const issueDescription = issueInput.value.trim();
+    if (!selectedApp || !issueDescription) return;
 
-    if (!selectedApp || !issueDescription) {
-      return;
+    // Loading state
+    searchButton.disabled   = true;
+    searchButton.textContent = "Searching…";
+
+    try {
+      const cases = await loadCases(selectedApp);
+
+      let bestCase = null, bestScore = 0, bestKeywords = [];
+
+      cases.forEach((item) => {
+        const candidateText = [
+          item.problem, item.symptoms, item.root_cause,
+          item.resolution, item.verification,
+        ].join(" ");
+        const score = similarity(issueDescription, candidateText);
+        if (score > bestScore) {
+          bestScore    = score;
+          bestCase     = item;
+          bestKeywords = getMatchedKeywords(issueDescription, candidateText);
+        }
+      });
+
+      renderResult(resultCard, bestCase, bestScore, selectedApp, issueDescription, bestKeywords);
+    } catch (err) {
+      showMessage(resultCard, "Search failed. Please try again.", "status-none");
+    } finally {
+      searchButton.disabled    = false;
+      searchButton.textContent = "Search";
+      updateSearchControls(appSelect, issueInput, searchButton);
     }
-
-    const cases = await loadCases(selectedApp);
-
-    let bestCase = null;
-    let bestScore = 0;
-    let bestKeywords = [];
-
-    cases.forEach((item) => {
-      const candidateText = [
-        item.problem,
-        item.symptoms,
-        item.root_cause,
-        item.resolution,
-        item.verification,
-      ].join(" ");
-      const score = similarity(issueDescription, candidateText);
-
-      if (score > bestScore) {
-        bestScore = score;
-        bestCase = item;
-        bestKeywords = getMatchedKeywords(issueDescription, candidateText);
-      }
-    });
-
-    renderResult(resultCard, bestCase, bestScore, selectedApp, issueDescription, bestKeywords);
   });
 }
 
 function validateCasePayload(payload) {
+  // FIX: check "app" not "selectedApp"
   return Boolean(
-    payload.selectedApp &&
-      payload.problem &&
-      payload.symptoms &&
-      payload.root_cause &&
-      payload.resolution &&
-      payload.verification
+    payload.app &&
+    payload.problem &&
+    payload.symptoms &&
+    payload.root_cause &&
+    payload.resolution &&
+    payload.verification
   );
 }
 
-function storeCaseForApp(selectedApp, payload) {
-  const key = `cases_${selectedApp}`;
+function storeCaseForApp(appId, payload) {
+  const key   = `cases_${appId}`;
   const cases = getStoredList(key);
   cases.push(payload);
   saveStoredList(key, cases);
 }
 
 function renderQueue(messageContainer) {
-  const queueBody = document.getElementById("queue-body");
+  const queueBody  = document.getElementById("queue-body");
   const emptyState = document.getElementById("queue-empty");
-  if (!queueBody || !emptyState) {
-    return;
-  }
+  if (!queueBody || !emptyState) return;
 
+  // FIX: filter on "app" (consistent key); drop old entries that used "selectedApp"
   const queue = getStoredList(REQUEST_QUEUE_KEY).filter(
-    (item) => item && item.id && item.selectedApp && item.problem && item.status === "PENDING"
+    (item) => item && item.id && item.app && item.problem && item.status === "PENDING"
   );
 
   queueBody.innerHTML = "";
@@ -383,12 +355,12 @@ function renderQueue(messageContainer) {
     const row = document.createElement("tr");
     row.innerHTML = `
       <td>${item.id}</td>
-      <td>${item.selectedApp.toUpperCase()}</td>
+      <td>${appDisplayName(item.app)}</td>
       <td>${item.problem}</td>
       <td>
         <div class="table-actions">
-          <button class="button" type="button" data-action="approve" data-id="${item.id}">Approve</button>
-          <button class="button button-secondary" type="button" data-action="reject" data-id="${item.id}">Reject</button>
+          <button class="button"           type="button" data-action="approve" data-id="${item.id}">Approve</button>
+          <button class="button button-secondary" type="button" data-action="reject"  data-id="${item.id}">Reject</button>
         </div>
       </td>
     `;
@@ -398,11 +370,13 @@ function renderQueue(messageContainer) {
   queueBody.querySelectorAll("button[data-action]").forEach((button) => {
     button.addEventListener("click", () => {
       const action = button.getAttribute("data-action");
-      const id = button.getAttribute("data-id");
+      const id     = button.getAttribute("data-id");
+
       const currentQueue = getStoredList(REQUEST_QUEUE_KEY).filter(
-        (item) => item && item.id && item.selectedApp && item.problem && item.status === "PENDING"
+        (item) => item && item.id && item.app && item.problem && item.status === "PENDING"
       );
       const target = currentQueue.find((item) => item.id === id);
+
       if (!target) {
         showMessage(messageContainer, "Invalid queue entry.", "status-none");
         return;
@@ -410,27 +384,21 @@ function renderQueue(messageContainer) {
 
       if (action === "approve") {
         storeCaseForApp(target.app, {
-          case_id: `CASE-${Date.now()}`,
-          app: target.selectedApp,
-          problem: target.problem,
-          symptoms: "To be filled",
-          root_cause: "To be filled",
-          resolution: "To be filled",
+          case_id:      `CASE-${Date.now()}`,
+          app:          target.app,
+          problem:      target.problem,
+          symptoms:     "To be filled",
+          root_cause:   "To be filled",
+          resolution:   "To be filled",
           verification: "To be filled",
         });
-        saveStoredList(
-          REQUEST_QUEUE_KEY,
-          currentQueue.filter((item) => item.id !== id)
-        );
-        showMessage(messageContainer, "Case approved and added", "status-confirmed");
+        saveStoredList(REQUEST_QUEUE_KEY, currentQueue.filter((item) => item.id !== id));
+        showMessage(messageContainer, "Case approved and added to the library.", "status-confirmed");
       }
 
       if (action === "reject") {
-        saveStoredList(
-          REQUEST_QUEUE_KEY,
-          currentQueue.filter((item) => item.id !== id)
-        );
-        showMessage(messageContainer, "Request rejected", "status-possible");
+        saveStoredList(REQUEST_QUEUE_KEY, currentQueue.filter((item) => item.id !== id));
+        showMessage(messageContainer, "Request rejected.", "status-possible");
       }
 
       renderQueue(messageContainer);
@@ -440,22 +408,19 @@ function renderQueue(messageContainer) {
 
 async function initializeAdminPage() {
   const form = document.getElementById("case-form");
-  if (!form) {
-    return;
-  }
+  if (!form) return;
 
-  if (typeof requireAdmin === "function" && !requireAdmin()) {
-    return;
-  }
+  // FIX: auth guard runs before any rendering work
+  if (typeof requireAdmin === "function" && !requireAdmin()) return;
 
   attachLogout();
 
-  const messageContainer = document.getElementById("admin-message");
-  const appSelect = document.getElementById("case-app");
-  const problemInput = document.getElementById("case-problem");
-  const symptomsInput = document.getElementById("case-symptoms");
-  const rootCauseInput = document.getElementById("case-root-cause");
-  const resolutionInput = document.getElementById("case-resolution");
+  const messageContainer  = document.getElementById("admin-message");
+  const appSelect         = document.getElementById("case-app");
+  const problemInput      = document.getElementById("case-problem");
+  const symptomsInput     = document.getElementById("case-symptoms");
+  const rootCauseInput    = document.getElementById("case-root-cause");
+  const resolutionInput   = document.getElementById("case-resolution");
   const verificationInput = document.getElementById("case-verification");
 
   try {
@@ -465,16 +430,16 @@ async function initializeAdminPage() {
     return;
   }
 
-  form.addEventListener("submit", (event) => {
-    event.preventDefault();
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
 
     const payload = {
-      case_id: `CASE-${Date.now()}`,
-      app: appSelect.value,
-      problem: problemInput.value.trim(),
-      symptoms: symptomsInput.value.trim(),
-      root_cause: rootCauseInput.value.trim(),
-      resolution: resolutionInput.value.trim(),
+      case_id:      `CASE-${Date.now()}`,
+      app:          appSelect.value,       // FIX: key is "app" everywhere
+      problem:      problemInput.value.trim(),
+      symptoms:     symptomsInput.value.trim(),
+      root_cause:   rootCauseInput.value.trim(),
+      resolution:   resolutionInput.value.trim(),
       verification: verificationInput.value.trim(),
     };
 
@@ -483,8 +448,8 @@ async function initializeAdminPage() {
       return;
     }
 
-    storeCaseForApp(payload.selectedApp, payload);
-    showMessage(messageContainer, "Case saved (POC)", "status-confirmed");
+    storeCaseForApp(payload.app, payload);
+    showMessage(messageContainer, "Case saved successfully.", "status-confirmed");
     form.reset();
     renderQueue(messageContainer);
   });
