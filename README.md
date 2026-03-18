@@ -1,8 +1,8 @@
 # Ops Atlas POC
 
-## Static documentation app layout
+## Web POC
 
-This repository hosts the Ops Atlas static proof of concept from the `doc/` directory, with case data stored under `doc/app/`. The implementation is fully static and uses only HTML, CSS, JavaScript, static JSON, and `localStorage`.
+This repository includes a minimal static web proof of concept in `web/` for demonstrating an Ops Atlas workflow on GitHub Pages using only HTML, CSS, JavaScript, static JSON, and `localStorage`.
 
 ### Run locally
 
