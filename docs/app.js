@@ -1,462 +1,527 @@
 const REQUEST_QUEUE_KEY = "request_queue";
 
-// Stop words excluded from keyword scoring
 const STOP_WORDS = new Set([
-  "a","an","the","is","are","was","were","be","been","being",
-  "have","has","had","do","does","did","will","would","could",
-  "should","may","might","shall","can","need","on","in","at",
-  "to","for","of","and","or","not","no","by","with","from",
-  "up","out","as","it","its","this","that","these","those",
-  "after","before","between","into","through","during","after",
-  "above","below","then","once","here","there","when","where",
-  "why","how","all","both","each","few","more","most","other",
+  "a","an","the","is","are","was","were","be","been","being","have","has","had",
+  "do","does","did","will","would","could","should","may","might","shall","can",
+  "need","on","in","at","to","for","of","and","or","not","no","by","with","from",
+  "up","out","as","it","its","this","that","these","those","after","before",
+  "between","into","through","during","above","below","then","once","here","there",
+  "when","where","why","how","all","both","each","few","more","most","other",
   "some","such","than","too","very","just","but","also","so"
 ]);
 
-function tokenize(text) {
-  return String(text || "")
-    .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter((word) => word.length > 1 && !STOP_WORDS.has(word));
-}
-
-function similarity(a, b) {
-  const sourceWords = tokenize(a);
-  if (!sourceWords.length) return 0;
-  const comparisonWords = new Set(tokenize(b));
-  const overlappingWords = sourceWords.filter((word) => comparisonWords.has(word)).length;
-  return overlappingWords / sourceWords.length;
-}
-
-function getMatchedKeywords(a, b) {
-  const sourceWords = [...new Set(tokenize(a))];
-  const comparisonWords = new Set(tokenize(b));
-  return sourceWords.filter((word) => comparisonWords.has(word));
-}
-
-function getStatus(score) {
-  if (score >= 0.55) return { label: "CONFIRMED SOLUTION", className: "status-confirmed" };
-  if (score >= 0.25) return { label: "POSSIBLE MATCH",    className: "status-possible"  };
-  return                     { label: "NO KNOWN SOLUTION", className: "status-none"      };
-}
-
-function toPercent(value) {
-  return `${Math.round(value * 100)}%`;
-}
-
-function showMessage(container, text, statusClass = "status-possible") {
-  if (!container) return;
-  container.className = `card ${statusClass}`;
-  container.textContent = text;
-  container.classList.remove("hidden");
-  // Auto-dismiss after 4 seconds
-  clearTimeout(container._dismissTimer);
-  container._dismissTimer = setTimeout(() => hideMessage(container), 4000);
-}
-
-function hideMessage(container) {
-  if (!container) return;
-  container.classList.add("hidden");
-  container.textContent = "";
-}
-
-function getStoredList(key) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (error) {
-    return [];
-  }
-}
-
-function saveStoredList(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
-}
-
-// Display names for app IDs
 const APP_DISPLAY_NAMES = {
   rag:  "Network Core Router (RAG)",
   dem:  "Digital Edge Mediation (DEM)",
   tsno: "Transport Stack NOC (TSNO)",
 };
+function appDisplayName(id) { return APP_DISPLAY_NAMES[id] || id.toUpperCase(); }
 
-function appDisplayName(id) {
-  return APP_DISPLAY_NAMES[id] || id.toUpperCase();
+/* ─── HELPERS ─── */
+function tokenize(text) {
+  return String(text || "").toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(w => w.length > 1 && !STOP_WORDS.has(w));
+}
+function similarity(a, b) {
+  const src = tokenize(a);
+  if (!src.length) return 0;
+  const cmp = new Set(tokenize(b));
+  return src.filter(w => cmp.has(w)).length / src.length;
+}
+function getMatchedKeywords(a, b) {
+  const src = [...new Set(tokenize(a))];
+  const cmp = new Set(tokenize(b));
+  return src.filter(w => cmp.has(w));
+}
+function getStatus(score) {
+  if (score >= 0.55) return { label: "CONFIRMED SOLUTION", cls: "status-confirmed", badgeCls: "badge-confirmed" };
+  if (score >= 0.25) return { label: "POSSIBLE MATCH",    cls: "status-possible",  badgeCls: "badge-possible"  };
+  return                     { label: "NO KNOWN SOLUTION", cls: "status-none",      badgeCls: "badge-none"      };
+}
+function toPercent(v) { return `${Math.round(v * 100)}%`; }
+
+function getStoredList(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const p = JSON.parse(raw);
+    return Array.isArray(p) ? p : [];
+  } catch { return []; }
+}
+function saveStoredList(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+/* ─── MESSAGE FLASH ─── */
+function showMessage(el, text, cls = "status-possible") {
+  if (!el) return;
+  el.className = cls;
+  el.textContent = text;
+  el.classList.remove("hidden");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => hideMessage(el), 5000);
+}
+function hideMessage(el) {
+  if (!el) return;
+  el.classList.add("hidden");
+  el.textContent = "";
 }
 
-async function loadApps(selectElement, preferredValue = "") {
-  const response = await fetch("./apps/apps.json");
-  const apps = await response.json();
-
-  selectElement.innerHTML = '<option value="">Select an application</option>';
-  apps.forEach((appId) => {
-    const option = document.createElement("option");
-    option.value = appId;
-    option.textContent = appDisplayName(appId);
-    option.selected = preferredValue === appId;
-    selectElement.appendChild(option);
+/* ─── APPS LOADER ─── */
+async function loadApps(select, preferred = "") {
+  const res = await fetch("./apps/apps.json");
+  const apps = await res.json();
+  select.innerHTML = '<option value="">Select an application</option>';
+  apps.forEach(id => {
+    const o = document.createElement("option");
+    o.value = id;
+    o.textContent = appDisplayName(id);
+    o.selected = id === preferred;
+    select.appendChild(o);
   });
-
   return apps;
 }
-
-async function loadCases(selectedApp) {
-  const response = await fetch(`./apps/${selectedApp}/cases/index.json`);
-  const staticCases = await response.json();
-  const localCases = getStoredList(`cases_${selectedApp}`);
-  return [...staticCases, ...localCases];
+async function loadCases(app) {
+  const res = await fetch(`./apps/${app}/cases/index.json`);
+  const stat = await res.json();
+  return [...stat, ...getStoredList(`cases_${app}`)];
 }
 
-function buildRequest(appId, issueDescription) {
-  return {
-    id: `REQ-${Date.now()}`,
-    app: appId,           // FIX: consistent key is always "app"
-    problem: issueDescription,
-    status: "PENDING",
-  };
+/* ─── SEARCH CONTROLS ─── */
+function updateSearchControls(appSel, issueIn, btn) {
+  const hasApp   = Boolean(appSel.value);
+  const hasIssue = Boolean(issueIn.value.trim());
+  issueIn.disabled = !hasApp;
+  btn.disabled = !(hasApp && hasIssue);
 }
 
-function submitRequest(appId, issueDescription) {
-  if (!appId || !issueDescription) return false;
-
-  const confirmed = window.confirm(
-    "Submit this incident as a request for admin approval to create a new case?"
-  );
-  if (!confirmed) return false;
-
-  const queue = getStoredList(REQUEST_QUEUE_KEY);
-  queue.push(buildRequest(appId, issueDescription));
-  saveStoredList(REQUEST_QUEUE_KEY, queue);
-  return true;
-}
-
-function renderResult(container, bestCase, score, selectedApp, issueDescription, matchedKeywords) {
-  const confidence = score;
-  const status = getStatus(score);
-  const matchedLabel = matchedKeywords.length ? matchedKeywords.join(", ") : "None";
-  const requestDisabled = status.label === "CONFIRMED SOLUTION";
-  const tooltip = requestDisabled
-    ? "High confidence solution exists"
-    : "Submit this issue for admin review and case creation";
-
-  container.className = `card result-card ${status.className}`;
-  container.classList.remove("hidden");
-
-  const detailMarkup =
-    status.label === "NO KNOWN SOLUTION"
-      ? `<p class="empty-state">No similar incident found.</p>`
-      : `
-        <div class="result-grid">
-          <article><h3>Problem</h3><p>${bestCase.problem}</p></article>
-          <article><h3>Resolution</h3><pre>${bestCase.resolution}</pre></article>
-        </div>
-        <div class="result-grid secondary-grid">
-          <article><h3>Symptoms</h3><p>${bestCase.symptoms || "To be filled"}</p></article>
-          <article><h3>Verification</h3><p>${bestCase.verification || "To be filled"}</p></article>
-        </div>
-      `;
-
-  const warningMarkup =
-    status.label === "POSSIBLE MATCH"
-      ? '<p class="warning-text">Warning: review this partial match carefully before following the resolution.</p>'
-      : "";
-
-  container.innerHTML = `
-    <div class="result-header">
-      <h2>Status: ${status.label}</h2>
-      ${bestCase?.case_id ? `<span class="badge">${bestCase.case_id}</span>` : ""}
-    </div>
-    <div class="metrics">
-      <p><strong>Confidence Score:</strong> ${toPercent(confidence)}</p>
-    </div>
-    <p><strong>Matched Keywords:</strong> ${matchedLabel}</p>
-    ${warningMarkup}
-    ${detailMarkup}
-    <div class="request-action">
-      <button
-        id="request-case-button"
-        class="button ${status.label === "NO KNOWN SOLUTION" ? "button-emphasis" : "button-secondary"}"
-        type="button"
-        ${requestDisabled ? "disabled" : ""}
-        title="${tooltip}"
-      >
-        Request for New Case
-      </button>
-      <span class="helper-text">${tooltip}</span>
-    </div>
-  `;
-
-  const requestButton = document.getElementById("request-case-button");
-  if (requestButton && !requestDisabled) {
-    requestButton.addEventListener("click", () => {
-      const submitted = submitRequest(selectedApp, issueDescription);
-      if (submitted) {
-        const helper = container.querySelector(".helper-text");
-        if (helper) helper.textContent = "Request submitted for admin approval";
-        requestButton.disabled = true;
-      }
-    });
-  }
-}
-
-function updateSearchControls(appSelect, issueInput, searchButton) {
-  const hasApp = Boolean(appSelect.value);
-  const hasIssue = Boolean(issueInput.value.trim());
-  issueInput.disabled = !hasApp;
-  searchButton.disabled = !(hasApp && hasIssue);
-}
-
-function attachLogout(buttonId = "logout-button") {
-  const button = document.getElementById(buttonId);
-  if (!button) return;
-  button.addEventListener("click", () => {
+/* ─── LOGOUT ─── */
+function attachLogout(id = "logout-button") {
+  const btn = document.getElementById(id);
+  if (!btn) return;
+  btn.addEventListener("click", () => {
     localStorage.removeItem("role");
     window.location.href = "index.html";
   });
 }
 
-function initializeLoginPage() {
-  const userForm  = document.getElementById("user-login-form");
-  const adminForm = document.getElementById("admin-login-form");
-  const message   = document.getElementById("login-message");
-  if (!userForm || !adminForm || !message) return;
-
-  const handleLogin = (username, password, expectedUsername, expectedPassword, role, target) => {
-    hideMessage(message);
-    if (username === expectedUsername && password === expectedPassword) {
-      localStorage.setItem("role", role);
-      window.location.href = target;
-      return;
-    }
-    showMessage(message, "Invalid username or password.", "status-none");
-  };
-
-  userForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    handleLogin(
-      document.getElementById("user-username").value.trim(),
-      document.getElementById("user-password").value,
-      "user1", "p@ssword", "user", "search.html"
-    );
-  });
-
-  adminForm.addEventListener("submit", (e) => {
-    e.preventDefault();
-    handleLogin(
-      document.getElementById("admin-username").value.trim(),
-      document.getElementById("admin-password").value,
-      "admin", "admin", "admin", "admin.html"
-    );
-  });
+/* ─── FIELD COMPLETENESS ─── */
+function countFilledFields(item) {
+  const fields = ["problem","symptoms","root_cause","resolution","verification"];
+  const filled = fields.filter(f => item[f] && String(item[f]).trim() && item[f] !== "To be filled");
+  return { filled: filled.length, total: fields.length };
+}
+function completenessBar(item) {
+  const { filled, total } = countFilledFields(item);
+  const pct = Math.round((filled / total) * 100);
+  const color = filled === total ? "var(--green)" : filled >= 3 ? "var(--amber)" : "var(--coral)";
+  return `<div style="display:flex;align-items:center;gap:.5rem;font-size:.75rem;color:var(--text-muted);">
+    <div style="flex:1;height:4px;background:var(--border);border-radius:2px;">
+      <div style="width:${pct}%;height:100%;background:${color};border-radius:2px;"></div>
+    </div>
+    <span style="color:${color};font-family:'Space Mono',monospace;">${filled}/${total}</span>
+  </div>`;
 }
 
+/* ════════════════════════════════════════════════
+   SEARCH PAGE
+════════════════════════════════════════════════ */
 async function initializeSearchPage() {
   const form = document.getElementById("search-form");
   if (!form) return;
-
-  if (!isUser() && !isAdmin()) {
-    window.location.href = "index.html";
-    return;
-  }
-
+  if (!isUser() && !isAdmin()) { window.location.href = "index.html"; return; }
   attachLogout();
 
-  const appSelect    = document.getElementById("app-select");
-  const issueInput   = document.getElementById("issue-input");
-  const searchButton = document.getElementById("search-button");
-  const resultCard   = document.getElementById("result-card");
+  const appSel    = document.getElementById("app-select");
+  const issueIn   = document.getElementById("issue-input");
+  const searchBtn = document.getElementById("search-button");
+  const resultCard = document.getElementById("result-card");
 
   try {
-    await loadApps(appSelect);
-    updateSearchControls(appSelect, issueInput, searchButton);
-  } catch (error) {
-    showMessage(resultCard, "Unable to load applications. Please refresh the page.", "status-none");
+    await loadApps(appSel);
+    updateSearchControls(appSel, issueIn, searchBtn);
+  } catch {
+    showMessage(resultCard, "Unable to load applications. Please refresh.", "status-none");
     return;
   }
 
-  appSelect.addEventListener("change",  () => updateSearchControls(appSelect, issueInput, searchButton));
-  issueInput.addEventListener("input",  () => updateSearchControls(appSelect, issueInput, searchButton));
+  appSel.addEventListener("change",  () => updateSearchControls(appSel, issueIn, searchBtn));
+  issueIn.addEventListener("input",  () => updateSearchControls(appSel, issueIn, searchBtn));
 
-  form.addEventListener("submit", async (e) => {
+  form.addEventListener("submit", async e => {
     e.preventDefault();
+    const app   = appSel.value;
+    const query = issueIn.value.trim();
+    if (!app || !query) return;
 
-    const selectedApp     = appSelect.value;
-    const issueDescription = issueInput.value.trim();
-    if (!selectedApp || !issueDescription) return;
-
-    // Loading state
-    searchButton.disabled   = true;
-    searchButton.textContent = "Searching…";
+    searchBtn.disabled    = true;
+    searchBtn.textContent = "Searching…";
 
     try {
-      const cases = await loadCases(selectedApp);
-
-      let bestCase = null, bestScore = 0, bestKeywords = [];
-
-      cases.forEach((item) => {
-        const candidateText = [
-          item.problem, item.symptoms, item.root_cause,
-          item.resolution, item.verification,
-        ].join(" ");
-        const score = similarity(issueDescription, candidateText);
-        if (score > bestScore) {
-          bestScore    = score;
-          bestCase     = item;
-          bestKeywords = getMatchedKeywords(issueDescription, candidateText);
-        }
+      const cases = await loadCases(app);
+      let best = null, bestScore = 0, bestKw = [];
+      cases.forEach(item => {
+        const txt = [item.problem, item.symptoms, item.root_cause, item.resolution, item.verification].join(" ");
+        const sc  = similarity(query, txt);
+        if (sc > bestScore) { bestScore = sc; best = item; bestKw = getMatchedKeywords(query, txt); }
       });
-
-      renderResult(resultCard, bestCase, bestScore, selectedApp, issueDescription, bestKeywords);
-    } catch (err) {
+      renderResult(resultCard, best, bestScore, app, query, bestKw);
+    } catch {
       showMessage(resultCard, "Search failed. Please try again.", "status-none");
     } finally {
-      searchButton.disabled    = false;
-      searchButton.textContent = "Search";
-      updateSearchControls(appSelect, issueInput, searchButton);
+      searchBtn.disabled    = false;
+      searchBtn.textContent = "Search knowledge base";
+      updateSearchControls(appSel, issueIn, searchBtn);
     }
   });
+
+  /* ── Request modal wiring ── */
+  const modal      = document.getElementById("request-modal");
+  const closeBtn   = document.getElementById("modal-close-btn");
+  const cancelBtn  = document.getElementById("modal-cancel-btn");
+  const reqForm    = document.getElementById("request-form");
+
+  function openModal(app, query) {
+    document.getElementById("req-app").value           = app;
+    document.getElementById("req-original-query").value = query;
+    document.getElementById("req-app-display").value   = appDisplayName(app);
+    document.getElementById("req-problem").value       = query;
+    modal.classList.add("open");
+  }
+  function closeModal() { modal.classList.remove("open"); reqForm.reset(); }
+
+  closeBtn.addEventListener("click",  closeModal);
+  cancelBtn.addEventListener("click", closeModal);
+  modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+
+  reqForm.addEventListener("submit", e => {
+    e.preventDefault();
+    const app = document.getElementById("req-app").value;
+    const item = {
+      id:           `REQ-${Date.now()}`,
+      app,
+      status:       "PENDING",
+      problem:      document.getElementById("req-problem").value.trim(),
+      symptoms:     document.getElementById("req-symptoms").value.trim(),
+      root_cause:   document.getElementById("req-root-cause").value.trim(),
+      resolution:   document.getElementById("req-resolution").value.trim(),
+      verification: document.getElementById("req-verification").value.trim(),
+      submitted_at: new Date().toISOString(),
+    };
+    const queue = getStoredList(REQUEST_QUEUE_KEY);
+    queue.push(item);
+    saveStoredList(REQUEST_QUEUE_KEY, queue);
+    closeModal();
+
+    /* update helper text on result card */
+    const helper = resultCard.querySelector(".helper-text");
+    const reqBtn = resultCard.querySelector("#request-case-button");
+    if (helper) helper.textContent = "Request submitted — an admin will review it shortly.";
+    if (reqBtn) reqBtn.disabled = true;
+  });
+
+  /* expose openModal so renderResult can call it */
+  window._openRequestModal = openModal;
 }
 
-function validateCasePayload(payload) {
-  // FIX: check "app" not "selectedApp"
-  return Boolean(
-    payload.app &&
-    payload.problem &&
-    payload.symptoms &&
-    payload.root_cause &&
-    payload.resolution &&
-    payload.verification
-  );
+/* ─── RENDER RESULT ─── */
+function renderResult(container, best, score, app, query, kw) {
+  const status = getStatus(score);
+  const kwHtml = kw.length
+    ? `<div class="matched-keywords">${kw.map(w => `<span class="keyword-chip">${w}</span>`).join("")}</div>`
+    : `<div class="matched-keywords"><span class="keyword-chip" style="color:var(--text-muted);">no keywords matched</span></div>`;
+
+  const noResult    = status.label === "NO KNOWN SOLUTION";
+  const requestDisabled = status.label === "CONFIRMED SOLUTION";
+  const tooltip     = requestDisabled ? "High-confidence solution exists" : "Submit for admin review";
+
+  const detailHtml = noResult
+    ? `<div class="empty-state"><div class="empty-state-icon">?</div>No matching incident found in the knowledge base.</div>`
+    : `<div class="result-grid">
+        <article><h3>Problem</h3><p>${best.problem}</p></article>
+        <article><h3>Symptoms</h3><p>${best.symptoms || "Not documented"}</p></article>
+        <article><h3>Root cause</h3><p>${best.root_cause || "Not documented"}</p></article>
+        <article><h3>Resolution</h3><pre>${best.resolution}</pre></article>
+        <article style="grid-column:1/-1"><h3>Verification</h3><p>${best.verification || "Not documented"}</p></article>
+      </div>`;
+
+  const warningHtml = status.label === "POSSIBLE MATCH"
+    ? `<p class="warning-text">Partial match — review carefully before following this resolution.</p>` : "";
+
+  container.className = `card result-card ${status.cls}`;
+  container.classList.remove("hidden");
+  container.innerHTML = `
+    <div class="result-header">
+      <div style="display:flex;align-items:center;gap:.75rem;flex-wrap:wrap;">
+        <h2>${status.label}</h2>
+        ${best?.case_id ? `<span class="badge badge-id">${best.case_id}</span>` : ""}
+      </div>
+      <span class="badge ${status.badgeCls}">${status.label}</span>
+    </div>
+    <div class="metrics-row">
+      <div class="metric">
+        <span class="metric-label">Confidence</span>
+        <span class="metric-value">${toPercent(score)}</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Matched keywords</span>
+        <span class="metric-value" style="font-size:1.1rem;">${kw.length}</span>
+      </div>
+    </div>
+    ${kwHtml}
+    ${warningHtml}
+    ${detailHtml}
+    <div class="request-action">
+      <button
+        id="request-case-button"
+        class="button ${noResult ? "button-amber" : "button-secondary"}"
+        type="button"
+        ${requestDisabled ? "disabled" : ""}
+        title="${tooltip}"
+      >
+        ${noResult ? "Document this incident" : "Request new case"}
+      </button>
+      <span class="helper-text">${tooltip}</span>
+    </div>`;
+
+  const reqBtn = container.querySelector("#request-case-button");
+  if (reqBtn && !requestDisabled && window._openRequestModal) {
+    reqBtn.addEventListener("click", () => window._openRequestModal(app, query));
+  }
 }
 
-function storeCaseForApp(appId, payload) {
-  const key   = `cases_${appId}`;
+/* ════════════════════════════════════════════════
+   LOGIN PAGE
+════════════════════════════════════════════════ */
+function initializeLoginPage() {
+  const uForm  = document.getElementById("user-login-form");
+  const aForm  = document.getElementById("admin-login-form");
+  const msg    = document.getElementById("login-message");
+  if (!uForm || !aForm) return;
+
+  const handle = (un, pw, expUn, expPw, role, dest) => {
+    hideMessage(msg);
+    if (un === expUn && pw === expPw) { localStorage.setItem("role", role); window.location.href = dest; return; }
+    showMessage(msg, "Invalid username or password.", "status-none");
+  };
+
+  uForm.addEventListener("submit", e => { e.preventDefault();
+    handle(document.getElementById("user-username").value.trim(),
+           document.getElementById("user-password").value,
+           "user1","p@ssword","user","search.html"); });
+
+  aForm.addEventListener("submit", e => { e.preventDefault();
+    handle(document.getElementById("admin-username").value.trim(),
+           document.getElementById("admin-password").value,
+           "admin","admin","admin","admin.html"); });
+}
+
+/* ════════════════════════════════════════════════
+   ADMIN PAGE
+════════════════════════════════════════════════ */
+function storeCaseForApp(app, payload) {
+  const key   = `cases_${app}`;
   const cases = getStoredList(key);
   cases.push(payload);
   saveStoredList(key, cases);
 }
 
-function renderQueue(messageContainer) {
-  const queueBody  = document.getElementById("queue-body");
-  const emptyState = document.getElementById("queue-empty");
-  if (!queueBody || !emptyState) return;
+function validateCasePayload(p) {
+  return Boolean(p.app && p.problem && p.symptoms && p.root_cause && p.resolution && p.verification);
+}
 
-  // FIX: filter on "app" (consistent key); drop old entries that used "selectedApp"
+/* ── VIEW MODAL ── */
+let _viewModalCurrentItem = null;
+let _viewModalMessageEl   = null;
+
+function openViewModal(item, messageEl) {
+  _viewModalCurrentItem = item;
+  _viewModalMessageEl   = messageEl;
+
+  const { filled, total } = countFilledFields(item);
+  const eyebrow = document.getElementById("view-modal-eyebrow");
+  const title   = document.getElementById("view-modal-title");
+  const body    = document.getElementById("view-modal-body");
+  const modal   = document.getElementById("view-modal");
+
+  eyebrow.textContent = `${item.id} · ${appDisplayName(item.app)}`;
+  title.textContent   = item.problem || "Untitled request";
+
+  const field = (label, value, color = "var(--text-primary)") => `
+    <div>
+      <p style="font-family:'Space Mono',monospace;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--text-muted);margin-bottom:.35rem;">${label}</p>
+      <div style="background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;padding:.75rem 1rem;font-size:.875rem;color:${color};white-space:pre-wrap;line-height:1.6;">${value || '<span style="color:var(--text-muted);font-style:italic;">Not provided</span>'}</div>
+    </div>`;
+
+  body.innerHTML = `
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;margin-bottom:.25rem;">
+      <span class="badge badge-pending">PENDING REVIEW</span>
+      <span class="badge badge-id">${appDisplayName(item.app)}</span>
+      <span style="font-size:.75rem;color:var(--text-muted);">${item.submitted_at ? "Submitted " + new Date(item.submitted_at).toLocaleString() : ""}</span>
+    </div>
+    ${completenessBar(item)}
+    <div style="height:.5rem;"></div>
+    ${field("Problem", item.problem)}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+      ${field("Symptoms", item.symptoms)}
+      ${field("Root cause", item.root_cause)}
+    </div>
+    ${field("Resolution", item.resolution, "var(--teal)")}
+    ${field("Verification", item.verification)}`;
+
+  modal.classList.add("open");
+}
+
+function closeViewModal() {
+  document.getElementById("view-modal").classList.remove("open");
+  _viewModalCurrentItem = null;
+}
+
+function renderQueue(msgEl) {
+  const body  = document.getElementById("queue-body");
+  const empty = document.getElementById("queue-empty");
+  if (!body || !empty) return;
+
   const queue = getStoredList(REQUEST_QUEUE_KEY).filter(
-    (item) => item && item.id && item.app && item.problem && item.status === "PENDING"
+    i => i && i.id && i.app && i.problem && i.status === "PENDING"
   );
 
-  queueBody.innerHTML = "";
-  emptyState.classList.toggle("hidden", queue.length > 0);
+  body.innerHTML = "";
+  empty.classList.toggle("hidden", queue.length > 0);
 
-  queue.forEach((item) => {
+  queue.forEach(item => {
+    const { filled, total } = countFilledFields(item);
+    const pct = Math.round((filled / total) * 100);
+    const color = filled === total ? "var(--green)" : filled >= 3 ? "var(--amber)" : "var(--coral)";
+
     const row = document.createElement("tr");
     row.innerHTML = `
-      <td>${item.id}</td>
-      <td>${appDisplayName(item.app)}</td>
-      <td>${item.problem}</td>
-      <td>
-        <div class="table-actions">
-          <button class="button"           type="button" data-action="approve" data-id="${item.id}">Approve</button>
-          <button class="button button-secondary" type="button" data-action="reject"  data-id="${item.id}">Reject</button>
+      <td><span class="badge badge-id" style="font-size:.65rem;">${item.id.slice(0,12)}</span></td>
+      <td style="font-size:.8rem;">${appDisplayName(item.app)}</td>
+      <td style="max-width:220px;">
+        <div style="font-size:.82rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.problem}</div>
+        <div style="margin-top:.3rem;display:flex;align-items:center;gap:.4rem;">
+          <div style="width:60px;height:3px;background:var(--border);border-radius:2px;"><div style="width:${pct}%;height:100%;background:${color};border-radius:2px;"></div></div>
+          <span style="font-size:.68rem;color:${color};font-family:'Space Mono',monospace;">${filled}/${total} fields</span>
         </div>
       </td>
-    `;
-    queueBody.appendChild(row);
+      <td>
+        <span style="font-size:.75rem;color:${color};font-family:'Space Mono',monospace;">${pct}%</span>
+      </td>
+      <td>
+        <div class="table-actions">
+          <button class="button button-ghost" style="padding:.35rem .7rem;font-size:.78rem;" data-action="view"    data-id="${item.id}">View</button>
+          <button class="button button-primary" style="padding:.35rem .7rem;font-size:.78rem;" data-action="approve" data-id="${item.id}">Approve</button>
+          <button class="button button-danger"  style="padding:.35rem .7rem;font-size:.78rem;" data-action="reject"  data-id="${item.id}">Reject</button>
+        </div>
+      </td>`;
+    body.appendChild(row);
   });
 
-  queueBody.querySelectorAll("button[data-action]").forEach((button) => {
-    button.addEventListener("click", () => {
-      const action = button.getAttribute("data-action");
-      const id     = button.getAttribute("data-id");
-
-      const currentQueue = getStoredList(REQUEST_QUEUE_KEY).filter(
-        (item) => item && item.id && item.app && item.problem && item.status === "PENDING"
+  /* Event delegation for queue actions */
+  body.querySelectorAll("button[data-action]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const action = btn.dataset.action;
+      const id     = btn.dataset.id;
+      const q      = getStoredList(REQUEST_QUEUE_KEY).filter(
+        i => i && i.id && i.app && i.problem && i.status === "PENDING"
       );
-      const target = currentQueue.find((item) => item.id === id);
+      const target = q.find(i => i.id === id);
+      if (!target) { showMessage(msgEl, "Entry not found.", "status-none"); return; }
 
-      if (!target) {
-        showMessage(messageContainer, "Invalid queue entry.", "status-none");
+      if (action === "view") {
+        openViewModal(target, msgEl);
         return;
       }
-
       if (action === "approve") {
-        storeCaseForApp(target.app, {
-          case_id:      `CASE-${Date.now()}`,
-          app:          target.app,
-          problem:      target.problem,
-          symptoms:     "To be filled",
-          root_cause:   "To be filled",
-          resolution:   "To be filled",
-          verification: "To be filled",
-        });
-        saveStoredList(REQUEST_QUEUE_KEY, currentQueue.filter((item) => item.id !== id));
-        showMessage(messageContainer, "Case approved and added to the library.", "status-confirmed");
+        approveItem(target, q, msgEl);
+        return;
       }
-
       if (action === "reject") {
-        saveStoredList(REQUEST_QUEUE_KEY, currentQueue.filter((item) => item.id !== id));
-        showMessage(messageContainer, "Request rejected.", "status-possible");
+        saveStoredList(REQUEST_QUEUE_KEY, q.filter(i => i.id !== id));
+        showMessage(msgEl, `Request ${id} rejected.`, "status-possible");
+        renderQueue(msgEl);
       }
-
-      renderQueue(messageContainer);
     });
   });
+}
+
+function approveItem(target, currentQueue, msgEl) {
+  storeCaseForApp(target.app, {
+    case_id:      `CASE-${Date.now()}`,
+    app:          target.app,
+    problem:      target.problem,
+    symptoms:     target.symptoms     || "To be documented",
+    root_cause:   target.root_cause   || "To be documented",
+    resolution:   target.resolution   || "To be documented",
+    verification: target.verification || "To be documented",
+  });
+  saveStoredList(REQUEST_QUEUE_KEY, currentQueue.filter(i => i.id !== target.id));
+  showMessage(msgEl, `Case approved and published to the knowledge base.`, "status-confirmed");
+  renderQueue(msgEl);
+  closeViewModal();
 }
 
 async function initializeAdminPage() {
   const form = document.getElementById("case-form");
   if (!form) return;
-
-  // FIX: auth guard runs before any rendering work
   if (typeof requireAdmin === "function" && !requireAdmin()) return;
-
   attachLogout();
 
-  const messageContainer  = document.getElementById("admin-message");
-  const appSelect         = document.getElementById("case-app");
-  const problemInput      = document.getElementById("case-problem");
-  const symptomsInput     = document.getElementById("case-symptoms");
-  const rootCauseInput    = document.getElementById("case-root-cause");
-  const resolutionInput   = document.getElementById("case-resolution");
-  const verificationInput = document.getElementById("case-verification");
+  const msgEl   = document.getElementById("admin-message");
+  const appSel  = document.getElementById("case-app");
 
-  try {
-    await loadApps(appSelect);
-  } catch (error) {
-    showMessage(messageContainer, "Unable to load applications.", "status-none");
-    return;
-  }
+  try { await loadApps(appSel); }
+  catch { showMessage(msgEl, "Unable to load applications.", "status-none"); return; }
 
-  form.addEventListener("submit", (e) => {
+  form.addEventListener("submit", e => {
     e.preventDefault();
-
     const payload = {
       case_id:      `CASE-${Date.now()}`,
-      app:          appSelect.value,       // FIX: key is "app" everywhere
-      problem:      problemInput.value.trim(),
-      symptoms:     symptomsInput.value.trim(),
-      root_cause:   rootCauseInput.value.trim(),
-      resolution:   resolutionInput.value.trim(),
-      verification: verificationInput.value.trim(),
+      app:          appSel.value,
+      problem:      document.getElementById("case-problem").value.trim(),
+      symptoms:     document.getElementById("case-symptoms").value.trim(),
+      root_cause:   document.getElementById("case-root-cause").value.trim(),
+      resolution:   document.getElementById("case-resolution").value.trim(),
+      verification: document.getElementById("case-verification").value.trim(),
     };
-
     if (!validateCasePayload(payload)) {
-      showMessage(messageContainer, "Please complete all fields before saving.", "status-none");
-      return;
+      showMessage(msgEl, "Please complete all required fields.", "status-none"); return;
     }
-
     storeCaseForApp(payload.app, payload);
-    showMessage(messageContainer, "Case saved successfully.", "status-confirmed");
+    showMessage(msgEl, "Case saved and published to the knowledge base.", "status-confirmed");
     form.reset();
-    renderQueue(messageContainer);
+    renderQueue(msgEl);
   });
 
-  renderQueue(messageContainer);
+  /* ── View modal events ── */
+  const viewModal = document.getElementById("view-modal");
+  document.getElementById("view-modal-close").addEventListener("click",        closeViewModal);
+  document.getElementById("view-modal-close-footer").addEventListener("click", closeViewModal);
+  viewModal.addEventListener("click", e => { if (e.target === viewModal) closeViewModal(); });
+
+  document.getElementById("view-approve-btn").addEventListener("click", () => {
+    if (!_viewModalCurrentItem) return;
+    const q = getStoredList(REQUEST_QUEUE_KEY).filter(
+      i => i && i.id && i.app && i.problem && i.status === "PENDING"
+    );
+    approveItem(_viewModalCurrentItem, q, _viewModalMessageEl);
+  });
+
+  document.getElementById("view-reject-btn").addEventListener("click", () => {
+    if (!_viewModalCurrentItem) return;
+    const q = getStoredList(REQUEST_QUEUE_KEY).filter(
+      i => i && i.id && i.app && i.problem && i.status === "PENDING"
+    );
+    saveStoredList(REQUEST_QUEUE_KEY, q.filter(i => i.id !== _viewModalCurrentItem.id));
+    showMessage(_viewModalMessageEl, `Request rejected.`, "status-possible");
+    renderQueue(_viewModalMessageEl);
+    closeViewModal();
+  });
+
+  renderQueue(msgEl);
 }
 
+/* ─── BOOT ─── */
 document.addEventListener("DOMContentLoaded", () => {
   initializeLoginPage();
   initializeSearchPage();

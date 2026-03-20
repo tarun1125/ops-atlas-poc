@@ -3,57 +3,52 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ops Atlas</title>
+    <title>Ops Atlas — Incident Intelligence</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+
+    <header class="site-header">
+      <div class="logo">OPS<span>//</span>ATLAS</div>
+      <span style="font-size:.75rem;color:var(--text-muted);font-family:'Space Mono',monospace;">telecom incident intelligence</span>
+    </header>
+
     <main class="container">
       <section class="card hero">
-        <p class="eyebrow">Ops Atlas</p>
-        <h1>AI-assisted incident resolution and knowledge system for support teams.</h1>
+        <p class="eyebrow">Mission Control</p>
+        <h1 class="login-hero-text">Resolve incidents faster with <span>AI-assisted</span> knowledge</h1>
         <p class="lead">
-          Sign in as a support user to search incidents, or as an administrator to manage
-          the case library and review new case requests.
+          Sign in to search the incident playbook, or manage the knowledge base as an administrator.
         </p>
       </section>
 
-      <section class="login-grid">
-        <article class="card">
-          <p class="eyebrow">General User</p>
-          <h2>Search incidents</h2>
-          <p class="notice">Use the demo credentials: <strong>user1 / p@ssword</strong></p>
-          <form id="user-login-form" class="stack-lg">
-            <label>
-              Username
-              <input id="user-username" type="text" autocomplete="username" required />
-            </label>
-            <label>
-              Password
-              <input id="user-password" type="password" autocomplete="current-password" required />
-            </label>
-            <button type="submit" class="button">Login as User</button>
+      <div class="login-grid">
+        <article class="card login-card card-accent-teal">
+          <div class="login-role-label">Support engineer</div>
+          <h2 style="margin-bottom:.25rem;">Search incidents</h2>
+          <p style="margin-bottom:1.25rem;font-size:.875rem;">Find resolutions for active tickets using AI-matched cases.</p>
+          <div class="notice">demo: user1 / p@ssword</div>
+          <form id="user-login-form" class="stack-lg" style="margin-top:.75rem;">
+            <label>Username <input id="user-username" type="text" autocomplete="username" placeholder="user1" required /></label>
+            <label>Password <input id="user-password" type="password" autocomplete="current-password" placeholder="••••••••" required /></label>
+            <button type="submit" class="button button-primary">Sign in as engineer</button>
           </form>
         </article>
 
-        <article class="card">
-          <p class="eyebrow">Admin</p>
-          <h2>Manage knowledge</h2>
-          <p class="notice">Use the demo credentials: <strong>admin / admin</strong></p>
-          <form id="admin-login-form" class="stack-lg">
-            <label>
-              Username
-              <input id="admin-username" type="text" autocomplete="username" required />
-            </label>
-            <label>
-              Password
-              <input id="admin-password" type="password" autocomplete="current-password" required />
-            </label>
-            <button type="submit" class="button">Login as Admin</button>
+        <article class="card login-card card-accent-amber">
+          <div class="login-role-label" style="color:var(--amber);">Administrator</div>
+          <h2 style="margin-bottom:.25rem;">Manage knowledge</h2>
+          <p style="margin-bottom:1.25rem;font-size:.875rem;">Review, approve and curate the incident case library.</p>
+          <div class="notice" style="color:var(--amber);background:var(--amber-dim);border-color:rgba(245,158,11,0.2);">demo: admin / admin</div>
+          <form id="admin-login-form" class="stack-lg" style="margin-top:.75rem;">
+            <label>Username <input id="admin-username" type="text" autocomplete="username" placeholder="admin" required /></label>
+            <label>Password <input id="admin-password" type="password" autocomplete="current-password" placeholder="••••••••" required /></label>
+            <button type="submit" class="button button-amber">Sign in as admin</button>
           </form>
         </article>
-      </section>
+      </div>
 
-      <section id="login-message" class="card hidden status-none"></section>
+      <div id="login-message" class="hidden"></div>
     </main>
 
     <script src="auth.js"></script>

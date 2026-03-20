@@ -3,81 +3,75 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Admin Portal | Ops Atlas</title>
+    <title>Admin — Ops Atlas</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+
+    <header class="site-header">
+      <div class="logo">OPS<span>//</span>ATLAS</div>
+      <div class="header-actions">
+        <span class="role-pill" style="color:var(--amber);background:var(--amber-dim);border-color:rgba(245,158,11,0.25);">Admin</span>
+        <a class="button button-ghost" href="search.html">Open search</a>
+        <button id="logout-button" type="button" class="button button-ghost">Sign out</button>
+      </div>
+    </header>
+
     <main class="container">
-      <section class="card">
-        <div class="page-header">
-          <div>
-            <p class="eyebrow">Ops Atlas Admin</p>
-            <h1>Case Management Portal</h1>
-          </div>
-          <div class="toolbar">
-            <a class="button button-secondary" href="search.html">Open Search</a>
-            <button id="logout-button" type="button" class="button button-secondary">Logout</button>
-          </div>
-        </div>
-        <p class="lead">
-          Review pending user requests and add new knowledge cases directly into the local
-          browser-backed library for this proof of concept.
-        </p>
+      <section class="card hero card-accent-amber">
+        <p class="eyebrow" style="color:var(--amber);">Case management portal</p>
+        <h1>Knowledge base admin</h1>
+        <p class="lead">Review pending requests, add new cases, and maintain the incident library.</p>
       </section>
 
-      <section id="admin-message" class="card hidden"></section>
+      <div id="admin-message" class="hidden"></div>
 
-      <section class="admin-grid">
-        <article class="card">
+      <div class="admin-grid">
+
+        <!-- ── MANUAL CASE ENTRY ── -->
+        <article class="card card-accent-indigo">
           <div class="section-heading">
-            <p class="eyebrow">Add New Case</p>
-            <h2>Manual Case Entry</h2>
+            <p class="eyebrow" style="color:var(--indigo);">Manual entry</p>
+            <h2>Add new case</h2>
           </div>
 
           <form id="case-form" class="stack-lg">
-            <label>
-              App
+            <label>Application <span class="req">*</span>
               <select id="case-app" required>
-                <option value="">Loading applications...</option>
+                <option value="">Loading…</option>
               </select>
             </label>
-
-            <label>
-              Problem
-              <textarea id="case-problem" rows="3" required></textarea>
+            <label>Problem <span class="req">*</span>
+              <textarea id="case-problem" rows="2" required placeholder="Concise problem statement"></textarea>
             </label>
-
-            <label>
-              Symptoms
-              <textarea id="case-symptoms" rows="3" required></textarea>
+            <label>Symptoms <span class="req">*</span>
+              <textarea id="case-symptoms" rows="2" required placeholder="Observable symptoms, alarms, error codes"></textarea>
             </label>
-
-            <label>
-              Root Cause
-              <textarea id="case-root-cause" rows="3" required></textarea>
+            <label>Root cause <span class="req">*</span>
+              <textarea id="case-root-cause" rows="2" required placeholder="Technical root cause"></textarea>
             </label>
-
-            <label>
-              Resolution
-              <textarea id="case-resolution" rows="4" required></textarea>
+            <label>Resolution <span class="req">*</span>
+              <textarea id="case-resolution" rows="4" required placeholder="Step-by-step resolution commands or actions"></textarea>
             </label>
-
-            <label>
-              Verification
-              <textarea id="case-verification" rows="3" required></textarea>
+            <label>Verification <span class="req">*</span>
+              <textarea id="case-verification" rows="2" required placeholder="How to confirm the issue is resolved"></textarea>
             </label>
-
-            <button type="submit" class="button">Save Case</button>
+            <button type="submit" class="button button-primary">Save to library</button>
           </form>
         </article>
 
-        <article class="card">
+        <!-- ── APPROVAL QUEUE ── -->
+        <article class="card card-accent-amber">
           <div class="section-heading">
-            <p class="eyebrow">Approval Queue</p>
-            <h2>Pending Requests</h2>
+            <p class="eyebrow" style="color:var(--amber);">Approval queue</p>
+            <h2>Pending requests</h2>
           </div>
 
-          <div id="queue-empty" class="notice hidden">No pending requests.</div>
+          <div id="queue-empty" class="empty-state hidden">
+            <div class="empty-state-icon">✓</div>
+            No pending requests — queue is clear.
+          </div>
+
           <div class="table-wrap">
             <table>
               <thead>
@@ -85,15 +79,40 @@
                   <th>ID</th>
                   <th>App</th>
                   <th>Problem</th>
-                  <th>Action</th>
+                  <th>Fields</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="queue-body"></tbody>
             </table>
           </div>
         </article>
-      </section>
+
+      </div>
     </main>
+
+    <!-- ── VIEW CASE MODAL ── -->
+    <div id="view-modal" class="modal-backdrop">
+      <div class="modal" style="max-width:760px;">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow" id="view-modal-eyebrow">Case review</p>
+            <h2 id="view-modal-title">Case details</h2>
+          </div>
+          <button class="modal-close" id="view-modal-close" type="button">✕</button>
+        </div>
+
+        <div id="view-modal-body" class="stack-lg">
+          <!-- injected by JS -->
+        </div>
+
+        <div style="display:flex;gap:.75rem;justify-content:flex-end;padding-top:1.25rem;margin-top:1.25rem;border-top:1px solid var(--border);">
+          <button type="button" class="button button-ghost" id="view-modal-close-footer">Close</button>
+          <button type="button" class="button button-danger" id="view-reject-btn">Reject</button>
+          <button type="button" class="button button-primary" id="view-approve-btn">Approve &amp; publish</button>
+        </div>
+      </div>
+    </div>
 
     <script src="auth.js"></script>
     <script src="app.js"></script>

@@ -3,20 +3,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Search Incident | Ops Atlas</title>
+    <title>Search — Ops Atlas</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
+
+    <header class="site-header">
+      <div class="logo">OPS<span>//</span>ATLAS</div>
+      <div class="header-actions">
+        <span class="role-pill">Engineer</span>
+        <button id="logout-button" type="button" class="button button-ghost">Sign out</button>
+      </div>
+    </header>
+
     <main class="container">
-      <section class="card">
+      <section class="card card-accent-teal">
         <div class="page-header">
           <div>
-            <p class="eyebrow">Ops Atlas</p>
-            <h1>Search Incident Cases</h1>
-          </div>
-          <div class="toolbar">
-            <span class="role-pill">User Portal</span>
-            <button id="logout-button" type="button" class="button button-secondary">Logout</button>
+            <p class="eyebrow">Incident search</p>
+            <h1>Find a resolution</h1>
+            <p class="lead">Describe the symptoms or failure you are seeing.</p>
           </div>
         </div>
 
@@ -24,27 +30,86 @@
           <label>
             Application
             <select id="app-select" required>
-              <option value="">Loading applications...</option>
+              <option value="">Loading applications…</option>
             </select>
           </label>
-
           <label>
-            Issue Description
+            Issue description
             <textarea
               id="issue-input"
               rows="4"
-              placeholder="Select an application first, then describe the incident symptoms or failure..."
+              placeholder="Select an application first, then describe what you are seeing…"
               required
               disabled
             ></textarea>
           </label>
-
-          <button id="search-button" type="submit" class="button" disabled>Search</button>
+          <div>
+            <button id="search-button" type="submit" class="button button-primary" disabled>
+              Search knowledge base
+            </button>
+          </div>
         </form>
       </section>
 
-      <section id="result-card" class="card hidden"></section>
+      <section id="result-card" class="card result-card hidden"></section>
     </main>
+
+    <!-- ── NEW CASE REQUEST MODAL ── -->
+    <div id="request-modal" class="modal-backdrop">
+      <div class="modal">
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow" style="color:var(--amber);">New case request</p>
+            <h2>Document this incident</h2>
+            <p style="font-size:.85rem;color:var(--text-secondary);margin-top:.25rem;">
+              Fill in as much as you know now. Incomplete fields can be finished later from your backlog.
+            </p>
+          </div>
+          <button class="modal-close" id="modal-close-btn" type="button">✕</button>
+        </div>
+
+        <form id="request-form" class="stack-lg">
+          <input type="hidden" id="req-app" />
+          <input type="hidden" id="req-original-query" />
+
+          <label>
+            Application
+            <input type="text" id="req-app-display" disabled />
+          </label>
+
+          <label>
+            Problem statement <span class="req">*</span>
+            <textarea id="req-problem" rows="2" placeholder="One-sentence description of the problem" required></textarea>
+          </label>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;">
+            <label>
+              Symptoms
+              <textarea id="req-symptoms" rows="3" placeholder="Observable indicators, error messages, alarms…"></textarea>
+            </label>
+            <label>
+              Root cause
+              <textarea id="req-root-cause" rows="3" placeholder="Technical cause (if known)…"></textarea>
+            </label>
+          </div>
+
+          <label>
+            Resolution steps
+            <textarea id="req-resolution" rows="4" placeholder="Commands or actions taken to resolve…"></textarea>
+          </label>
+
+          <label>
+            Verification
+            <textarea id="req-verification" rows="2" placeholder="How to confirm the issue is resolved…"></textarea>
+          </label>
+
+          <div style="display:flex;gap:.75rem;justify-content:flex-end;padding-top:.5rem;border-top:1px solid var(--border);">
+            <button type="button" class="button button-ghost" id="modal-cancel-btn">Cancel</button>
+            <button type="submit" class="button button-amber">Submit to queue</button>
+          </div>
+        </form>
+      </div>
+    </div>
 
     <script src="auth.js"></script>
     <script src="app.js"></script>
